@@ -2,23 +2,23 @@ package xiaohongshu
 
 import "testing"
 
-func TestCreatorLoginDetected(t *testing.T) {
+func TestCreatorSessionReady(t *testing.T) {
 	tests := []struct {
-		name           string
-		url            string
-		hasLoginPanel  bool
-		wantLoginState bool
+		name          string
+		url           string
+		hasLoginPanel bool
+		wantReady     bool
 	}{
-		{name: "creator home is logged in", url: "https://creator.xiaohongshu.com/new/home"},
-		{name: "creator publish page is logged in", url: "https://creator.xiaohongshu.com/publish/publish"},
-		{name: "login redirect", url: "https://creator.xiaohongshu.com/login?source=official", wantLoginState: true},
-		{name: "login panel", url: "https://creator.xiaohongshu.com/new/home", hasLoginPanel: true, wantLoginState: true},
+		{name: "creator home is ready", url: "https://creator.xiaohongshu.com/new/home", wantReady: true},
+		{name: "creator publish page is ready", url: "https://creator.xiaohongshu.com/publish/publish", wantReady: true},
+		{name: "login redirect is pending", url: "https://creator.xiaohongshu.com/login?source=official"},
+		{name: "transient login panel is pending", url: "https://creator.xiaohongshu.com/new/home", hasLoginPanel: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if got := creatorLoginDetected(tt.url, tt.hasLoginPanel); got != tt.wantLoginState {
-				t.Fatalf("creatorLoginDetected(%q, %v) = %v, want %v", tt.url, tt.hasLoginPanel, got, tt.wantLoginState)
+			if got := creatorSessionReady(tt.url, tt.hasLoginPanel); got != tt.wantReady {
+				t.Fatalf("creatorSessionReady(%q, %v) = %v, want %v", tt.url, tt.hasLoginPanel, got, tt.wantReady)
 			}
 		})
 	}
