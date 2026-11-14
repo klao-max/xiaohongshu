@@ -9,7 +9,6 @@ import (
 
 	"github.com/go-rod/rod"
 	"github.com/sirupsen/logrus"
-	"github.com/xpzouying/headless_browser"
 	"github.com/xpzouying/xiaohongshu-mcp/browser"
 	"github.com/xpzouying/xiaohongshu-mcp/configs"
 	"github.com/xpzouying/xiaohongshu-mcp/cookies"
@@ -619,11 +618,22 @@ func (s *XiaohongshuService) ReplyNotification(ctx context.Context, commentID, c
 	return xiaohongshu.NewNotificationAction(page).Reply(ctx, commentID, content)
 }
 
-func newBrowser() *headless_browser.Browser {
-	return browser.NewBrowser(configs.IsHeadless(),
+func newBrowser() *managedBrowser {
+	release := browserTaskGate.acquire()
+	handedOff := false
+	defer func() {
+		if !handedOff {
+			release()
+		}
+	}()
+
+	b := browser.NewBrowser(configs.IsHeadless(),
 		browser.WithFingerprintSeed(configs.FingerprintSeed()),
 		browser.WithProxy(configs.Proxy()),
 	)
+
+	handedOff = true
+	return &managedBrowser{Browser: b, release: release}
 }
 
 func saveCookies(page *rod.Page) error {
