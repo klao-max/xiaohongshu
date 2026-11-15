@@ -46,6 +46,18 @@ type SearchFeedsArgs struct {
 	Filters FilterOption `json:"filters,omitempty" jsonschema:"筛选选项"`
 }
 
+// CollectTopicSnapshotArgs 采集话题快照的参数。
+type CollectTopicSnapshotArgs struct {
+	Keyword string       `json:"keyword" jsonschema:"要采集的关键词或话题"`
+	Filters FilterOption `json:"filters,omitempty" jsonschema:"搜索筛选选项"`
+	Limit   int          `json:"limit,omitempty" jsonschema:"最多保存多少条笔记，默认20，最大100"`
+}
+
+// AnalyzeTopicsArgs 话题分析参数。
+type AnalyzeTopicsArgs struct {
+	Keywords []string `json:"keywords" jsonschema:"要分析的关键词列表。先用 collect_topic_snapshot 采集数据"`
+}
+
 // FilterOption 筛选选项结构体
 type FilterOption struct {
 	SortBy      string `json:"sort_by,omitempty" jsonschema:"排序依据: 综合|最新|最多点赞|最多评论|最多收藏,默认为'综合'"`
@@ -295,7 +307,51 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	// 工具 7: 获取Feed详情
+	// 工具 7: 采集话题快照
+	collectTopicSchema, err := jsonschema.For[CollectTopicSnapshotArgs](nil)
+	if err != nil {
+		panic(fmt.Sprintf("collect_topic_snapshot 参数 schema 生成失败: %v", err))
+	}
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "collect_topic_snapshot",
+			Description: "搜索关键词并把笔记互动数据保存到本地 SQLite 快照。AI 可以在用户要求分析话题时调用；默认采集20条，最多100条。",
+			InputSchema: collectTopicSchema,
+			Annotations: &mcp.ToolAnnotations{Title: "Collect Topic Snapshot"},
+		},
+		withPanicRecovery("collect_topic_snapshot", func(ctx context.Context, req *mcp.CallToolRequest, args CollectTopicSnapshotArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleCollectTopicSnapshot(ctx, args)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	// 工具 8: 分析话题
+	analyzeTopicsSchema, err := jsonschema.For[AnalyzeTopicsArgs](nil)
+	if err != nil {
+		panic(fmt.Sprintf("analyze_topics 参数 schema 生成失败: %v", err))
+	}
+	if keywordsSchema := analyzeTopicsSchema.Properties["keywords"]; keywordsSchema != nil {
+		keywordsSchema.Type = "array"
+		keywordsSchema.Types = nil
+		keywordsSchema.MinItems = jsonschema.Ptr(1)
+	}
+	mcp.AddTool(server,
+		&mcp.Tool{
+			Name:        "analyze_topics",
+			Description: "分析已保存的话题快照，返回热度、相对上次快照的增长率、采样笔记数、去重作者数和高互动标题。先调用 collect_topic_snapshot 采集数据。",
+			InputSchema: analyzeTopicsSchema,
+			Annotations: &mcp.ToolAnnotations{
+				Title:        "Analyze Topics",
+				ReadOnlyHint: true,
+			},
+		},
+		withPanicRecovery("analyze_topics", func(ctx context.Context, req *mcp.CallToolRequest, args AnalyzeTopicsArgs) (*mcp.CallToolResult, any, error) {
+			result := appServer.handleAnalyzeTopics(ctx, args)
+			return convertToMCPResult(result), nil, nil
+		}),
+	)
+
+	// 工具 9: 获取Feed详情
 	mcp.AddTool(server,
 		&mcp.Tool{
 			Name:        "get_feed_detail",
@@ -560,7 +616,7 @@ func registerTools(server *mcp.Server, appServer *AppServer) {
 		}),
 	)
 
-	logrus.Infof("Registered %d MCP tools", 18)
+	logrus.Infof("Registered %d MCP tools", 20)
 }
 
 // convertToMCPResult 将自定义的 MCPToolResult 转换为官方 SDK 的格式

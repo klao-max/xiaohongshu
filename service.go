@@ -5,10 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/go-rod/rod"
 	"github.com/sirupsen/logrus"
+	"github.com/xpzouying/xiaohongshu-mcp/analytics"
 	"github.com/xpzouying/xiaohongshu-mcp/browser"
 	"github.com/xpzouying/xiaohongshu-mcp/configs"
 	"github.com/xpzouying/xiaohongshu-mcp/cookies"
@@ -20,6 +22,10 @@ import (
 // XiaohongshuService 小红书业务服务
 type XiaohongshuService struct {
 	logins loginSessions
+
+	analyticsMu    sync.Mutex
+	analyticsStore *analytics.Store
+	analyticsErr   error
 }
 
 // NewXiaohongshuService 创建小红书服务实例

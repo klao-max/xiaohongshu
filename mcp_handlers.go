@@ -347,6 +347,51 @@ func (s *AppServer) handleSearchFeeds(ctx context.Context, args SearchFeedsArgs)
 	}
 }
 
+// handleCollectTopicSnapshot 采集并保存话题快照。
+func (s *AppServer) handleCollectTopicSnapshot(ctx context.Context, args CollectTopicSnapshotArgs) *MCPToolResult {
+	if strings.TrimSpace(args.Keyword) == "" {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "采集话题快照失败: 缺少keyword参数"}},
+			IsError: true,
+		}
+	}
+
+	filter := xiaohongshu.FilterOption{
+		SortBy:      args.Filters.SortBy,
+		NoteType:    args.Filters.NoteType,
+		PublishTime: args.Filters.PublishTime,
+		SearchScope: args.Filters.SearchScope,
+		Location:    args.Filters.Location,
+	}
+	result, err := s.xiaohongshuService.CollectTopicSnapshot(ctx, args.Keyword, filter, args.Limit)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "采集话题快照失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return marshalMCPResult(result, "采集话题快照")
+}
+
+// handleAnalyzeTopics 分析已保存的话题快照。
+func (s *AppServer) handleAnalyzeTopics(ctx context.Context, args AnalyzeTopicsArgs) *MCPToolResult {
+	if len(args.Keywords) == 0 {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "分析话题失败: keywords 不能为空"}},
+			IsError: true,
+		}
+	}
+
+	result, err := s.xiaohongshuService.AnalyzeTopics(ctx, args.Keywords)
+	if err != nil {
+		return &MCPToolResult{
+			Content: []MCPContent{{Type: "text", Text: "分析话题失败: " + err.Error()}},
+			IsError: true,
+		}
+	}
+	return marshalMCPResult(result, "分析话题")
+}
+
 // handleGetFeedDetail 处理获取Feed详情
 func (s *AppServer) handleGetFeedDetail(ctx context.Context, args map[string]any) *MCPToolResult {
 	logrus.Info("MCP: 获取Feed详情")
